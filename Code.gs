@@ -66,10 +66,23 @@ function formatSummaryHtml(subject, sender, summaryText, url) {
  *   Triggers → + Add Trigger → Choose function → Time-driven.
  */
 function summarizeUnreadEmailsFromSendersLast24Hours() {
-  const allowedSenders = [
-    'mail1@tocheckfor.com',
-    'mail2@tocheckfor.com'
-  ];
+
+  /**
+   * Map the email addresses we want to process to the label we want on the message
+   */
+  const sendersAndLabels = new Map([
+    ['mail1@tocheckfor.com', 'label1'],
+    ['mail2@tocheckfor.com', 'label2'],
+  ]);
+
+  // whitelist of allowed senders
+  const allowedSenders = Array.from(sendersAndLabels.keys());
+
+  /**
+   * regular expression to extract the sender's email address 
+   * because gmail returns a friendly 'from' address
+   */
+  const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
 
   // Search unread threads newer than 2 days to allow for time zones.
   const threads = GmailApp.search('is:unread newer_than:2d');
@@ -79,7 +92,7 @@ function summarizeUnreadEmailsFromSendersLast24Hours() {
     const threadUrl = `https://mail.google.com/mail/u/0/#inbox/${thread.getId()}`;
 
     thread.getMessages().forEach(msg => {
-      const sender = msg.getFrom();
+      const sender = msg.getFrom().match(emailRegex)[0];
 
       // Skip if sender isn’t on the whitelist.
       if (!allowedSenders.some(e => sender.includes(e))) return;
@@ -95,6 +108,9 @@ function summarizeUnreadEmailsFromSendersLast24Hours() {
 
         // Build an HTML block for this message.
         blocks.push(formatSummaryHtml(msg.getSubject(), sender, summary, threadUrl));
+
+        // label the message
+        msg.getThread().addLabel(GmailApp.getUserLabelByName(sendersAndLabels.get(sender)))
 
         // Mark message read so it isn’t processed again.
         msg.markRead();
